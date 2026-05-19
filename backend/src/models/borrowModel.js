@@ -1,6 +1,7 @@
 import getPool from '../config/db.js';
 
 const MAX_BORROW_LIMIT = 5;
+const RENEW_DAYS       = 7;   // extend by 7 days per renewal
 
 const BorrowModel = {
 
@@ -71,7 +72,6 @@ const BorrowModel = {
     if (copy.copy_status !== 'available')
       throw new Error(`Book is currently ${copy.copy_status}`);
 
-    // Check pending/ready reservations for this book
     const resvRes = await getPool().query(
       `SELECT r.id, r.user_id, r.status, r.reserved_at,
               u.full_name AS reader_name, u.email AS reader_email
@@ -134,7 +134,6 @@ const BorrowModel = {
           [item.book_id]
         );
 
-        // Nếu có đặt trước đang chờ, tự động chuyển sang fulfilled
         await client.query(
           `UPDATE book_reservations
            SET status = 'fulfilled'
@@ -152,7 +151,7 @@ const BorrowModel = {
     }
   },
 
-  // 4. Kiểm tra barcode để trả sách (không có fine)
+  // 4. Kiểm tra barcode để trả sách
   async checkReturnBarcode(barcode) {
     const res = await getPool().query(
       `SELECT
@@ -233,7 +232,7 @@ const BorrowModel = {
           [book_id]
         );
 
-        // ── Notification: invite to review ──────────────────────────────
+        // Notification: invite to review
         const reviewExistsRes = await client.query(
           `SELECT id, updated_at FROM book_reviews
            WHERE user_id = $1 AND book_id = $2 LIMIT 1`,
@@ -267,7 +266,7 @@ const BorrowModel = {
           );
         }
 
-        // ── Notify next person waiting for reservation ───────────────────
+        // Notify next person waiting for reservation
         const pendingResv = await client.query(
           `SELECT r.id, r.user_id
            FROM book_reservations r
@@ -298,7 +297,7 @@ const BorrowModel = {
         returnedItems.push({ borrow_id: id, user_id, book_id, book_title });
       }
 
-      // ── Reactivate suspended accounts that no longer have overdue books ─
+      // Reactivate suspended accounts that no longer have overdue books
       const uniqueUserIds = [...new Set(returnedItems.map(i => i.user_id))];
       for (const uid of uniqueUserIds) {
         const overdueCheckRes = await client.query(
@@ -369,6 +368,7 @@ const BorrowModel = {
     const dataRes = await getPool().query(
       `SELECT
          br.id, br.borrow_date, br.due_date, br.return_date, br.status,
+         br.renew_count, br.renew_limit,
          u.id AS reader_id, u.full_name AS reader_name, u.avatar_url AS reader_avatar,
          bc.barcode,
          bk.id AS book_id, bk.title AS book_title, bk.book_cover, bk.author AS book_author
@@ -389,6 +389,7 @@ const BorrowModel = {
     const result = await getPool().query(
       `SELECT
          br.id, br.borrow_date, br.due_date, br.return_date, br.status,
+         br.renew_count, br.renew_limit, br.last_renewed_at,
          u.id AS reader_id, u.full_name AS reader_name, u.avatar_url AS reader_avatar,
          u.email AS reader_email, u.phone AS reader_phone,
          bc.barcode, bk.id AS book_id, bk.title AS book_title,
@@ -410,6 +411,122 @@ const BorrowModel = {
        RETURNING id`
     );
     return result.rowCount;
+  },
+
+  // 9. Gia hạn sách — reader tự gia hạn
+  // Điều kiện: borrowing + chưa overdue + chưa hết renew_limit + không có reservation queue
+  async renew(borrowId, userId) {
+    const client = await getPool().connect();
+    try {
+      await client.query('BEGIN');
+
+      // Lock record để tránh race condition
+      const br = await client.query(
+        `SELECT br.id, br.status, br.due_date, br.renew_count, br.renew_limit,
+                br.book_copy_id, bc.book_id, bk.title AS book_title,
+                u.status AS user_status
+         FROM borrows br
+         JOIN book_copies bc ON bc.id = br.book_copy_id
+         JOIN books bk ON bk.id = bc.book_id
+         JOIN users u ON u.id = br.user_id
+         WHERE br.id = $1 AND br.user_id = $2
+         FOR UPDATE`,
+        [borrowId, userId]
+      );
+
+      if (!br.rows[0]) throw new Error('Borrow record not found');
+      const b = br.rows[0];
+
+      // Bước 2: kiểm tra trạng thái tài khoản
+      if (b.user_status === 'suspended') {
+        throw new Error('Your account is suspended due to overdue books. Please return them before renewing.');
+      }
+      if (b.user_status === 'banned') {
+        throw new Error('Your account has been banned. Please contact the library.');
+      }
+
+      // Bước 3: kiểm tra trạng thái borrow
+      if (b.status !== 'borrowing') {
+        throw new Error('Only active borrows can be renewed.');
+      }
+
+      // Bước 4: kiểm tra overdue
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = new Date(b.due_date);
+      dueDate.setHours(0, 0, 0, 0);
+      if (dueDate < today) {
+        throw new Error('This book is overdue and cannot be renewed. Please return it to the library first.');
+      }
+
+      // Bước 5: kiểm tra reservation queue — đảm bảo công bằng FIFO
+      const resvRes = await client.query(
+        `SELECT id FROM book_reservations
+         WHERE book_id = $1 AND status IN ('pending', 'ready')
+         LIMIT 1`,
+        [b.book_id]
+      );
+      if (resvRes.rows[0]) {
+        throw new Error('This book cannot be renewed because another reader has reserved it.');
+      }
+
+      // Bước 6: kiểm tra renew limit
+      const renewCount = Number(b.renew_count);
+      const renewLimit = Number(b.renew_limit);
+      if (renewCount >= renewLimit) {
+        throw new Error(`Maximum renewal limit reached (${renewLimit} renewal${renewLimit > 1 ? 's' : ''} allowed per borrow).`);
+      }
+
+      // Bước 7: tính due_date mới (+ RENEW_DAYS từ due_date hiện tại)
+      const newDue = new Date(b.due_date);
+      newDue.setDate(newDue.getDate() + RENEW_DAYS);
+      const newDueStr = newDue.toISOString().split('T')[0];
+
+      const updated = await client.query(
+        `UPDATE borrows
+         SET due_date        = $1,
+             renew_count     = renew_count + 1,
+             last_renewed_at = NOW(),
+             updated_at      = NOW()
+         WHERE id = $2
+         RETURNING id, due_date, renew_count, renew_limit, status`,
+        [newDueStr, borrowId]
+      );
+
+      const renewsRemaining = renewLimit - renewCount - 1;
+      const fmtDate = (d) => new Date(d).toLocaleDateString('vi-VN', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+      });
+
+      // Bước 8: gửi notification xác nhận
+      await client.query(
+        `INSERT INTO notifications (user_id, type, title, message)
+         VALUES ($1, 'general', $2, $3)`,
+        [
+          userId,
+          'Book Renewed Successfully ✓',
+          `"${b.book_title}" has been renewed until ${fmtDate(newDueStr)}. ` +
+          (renewsRemaining > 0
+            ? `You have ${renewsRemaining} renewal${renewsRemaining > 1 ? 's' : ''} remaining for this book.`
+            : 'This was your last renewal — please return the book on time.'),
+        ]
+      );
+
+      await client.query('COMMIT');
+
+      return {
+        ...updated.rows[0],
+        book_title:       b.book_title,
+        old_due_date:     b.due_date,
+        new_due_date:     newDueStr,
+        renews_remaining: renewsRemaining,
+      };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   },
 };
 

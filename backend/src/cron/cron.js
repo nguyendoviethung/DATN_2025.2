@@ -5,11 +5,10 @@ import NotificationModel from '../models/notificationModel.js';
 
 export const startBorrowCron = () => {
 
-  // chạy mỗi ngày lúc 00:00
-  cron.schedule('0 0 * * *', async () => {
+ const runDailyJobs = async () => {
     console.log('[CRON] Running daily jobs...');
     const pool = getPool();
-
+ 
     try {
       // 1. Đánh dấu borrows quá hạn là overdue
       const overdueRes = await pool.query(
@@ -147,5 +146,9 @@ export const startBorrowCron = () => {
     } catch (err) {
       console.error('[CRON ERROR]:', err);
     }
-  });
+  };
+   runDailyJobs();
+
+  // chạy mỗi ngày lúc 00:00
+  cron.schedule('0 0 * * *', runDailyJobs);
 };

@@ -38,6 +38,12 @@ const borrowService = {
   markOverdue() {
     return axiosClient.patch('/borrows/mark-overdue');
   },
+
+  // Gia hạn sách — reader tự thực hiện
+  // POST /api/reader-profile/borrows/:id/renew
+  renew(borrowId) {
+    return axiosClient.post(`/reader-profile/borrows/${borrowId}/renew`);
+  },
 };
 
 export default borrowService;

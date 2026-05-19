@@ -1,4 +1,5 @@
 import readerProfileModel from '../models/readerProfileModel.js';
+import borrowModel        from '../models/borrowModel.js';
 
 const readerProfileController = {
 
@@ -20,10 +21,10 @@ const readerProfileController = {
         user: {
           ...user,
           currently_borrowing: Number(stats.currently_borrowing),
-          overdue_count: Number(stats.overdue_count),
-          total_returned: Number(stats.total_returned),
-          total_borrows: Number(stats.total_borrows),
-          total_fine: Number(totalFine),
+          overdue_count:       Number(stats.overdue_count),
+          total_returned:      Number(stats.total_returned),
+          total_borrows:       Number(stats.total_borrows),
+          total_fine:          Number(totalFine),
         },
       });
 
@@ -73,7 +74,7 @@ const readerProfileController = {
       }
 
       res.json({
-        message: 'Avatar updated successfully',
+        message:    'Avatar updated successfully',
         avatar_url: user.avatar_url
       });
 
@@ -108,13 +109,39 @@ const readerProfileController = {
   async getDashboardData(req, res) {
     try {
       const userId = req.user.id;
-
-      const data = await readerProfileModel.getDashboard(userId);
-
+      const data   = await readerProfileModel.getDashboard(userId);
       res.json(data);
-
     } catch (err) {
       res.status(500).json({ message: 'Internal server error' });
+    }
+  },
+
+  // POST /api/reader-profile/borrows/:id/renew
+  // Gia hạn sách — reader tự thực hiện
+  async renewBorrow(req, res) {
+    try {
+      const borrowId = Number(req.params.id);
+      const userId   = req.user.id;
+
+      if (!borrowId || isNaN(borrowId)) {
+        return res.status(400).json({ message: 'Invalid borrow ID' });
+      }
+
+      const result = await borrowModel.renew(borrowId, userId); // ← sửa: borrowModel thay vì BorrowModel
+
+      return res.json({
+        message:          'Book renewed successfully',
+        borrow:           result,
+        new_due_date:     result.new_due_date,
+        renews_remaining: result.renews_remaining,
+      });
+
+    } catch (err) {
+      const msg = err.message || 'Failed to renew';
+      const status =
+        msg.includes('not found')                              ? 404 :
+        msg.includes('suspended') || msg.includes('banned')   ? 403 : 400;
+      return res.status(status).json({ message: msg });
     }
   },
 };

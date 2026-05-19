@@ -60,40 +60,48 @@ const readerProfileModel = {
   async countBorrowHistory(userId, status) {
     const params = [userId];
     let where = '';
-
     if (status) {
       params.push(status);
       where = `AND br.status = $2`;
     }
-
     const res = await getPool().query(
       `SELECT COUNT(*) FROM borrows br WHERE br.user_id = $1 ${where}`,
       params
     );
-
     return Number(res.rows[0].count);
   },
 
   async getBorrowHistory(userId, status, limit, offset) {
     const params = [userId];
     let where = '';
-
     if (status) {
       params.push(status);
       where = `AND br.status = $2`;
     }
-
     params.push(limit, offset);
 
     const res = await getPool().query(
       `SELECT
          br.id, br.borrow_date, br.due_date, br.return_date, br.status,
-         bk.title AS book_title, bk.book_cover, bk.author AS book_author,
+         br.renew_count, br.renew_limit, br.last_renewed_at,
+         u.status      AS user_status,
+         bk.id        AS book_id,
+         bk.title     AS book_title,
+         bk.book_cover,
+         bk.author    AS book_author,
          bc.barcode,
+         bc.book_id   AS copy_book_id,
          CASE WHEN br.status = 'overdue'
            THEN GREATEST(0, (CURRENT_DATE - br.due_date) * ${FINE_PER_DAY})
-           ELSE 0 END AS fine_amount
+           ELSE 0 END AS fine_amount,
+         -- Check if any reservation exists for this book (to disable renew)
+         EXISTS (
+           SELECT 1 FROM book_reservations r
+           WHERE r.book_id = bc.book_id
+             AND r.status IN ('pending', 'ready')
+         ) AS has_reservation_queue
        FROM borrows br
+       JOIN users u       ON u.id  = br.user_id
        JOIN book_copies bc ON bc.id = br.book_copy_id
        JOIN books bk       ON bk.id = bc.book_id
        WHERE br.user_id = $1 ${where}
@@ -112,11 +120,24 @@ const readerProfileModel = {
       pool.query(
         `SELECT
            br.id, br.borrow_date, br.due_date, br.return_date, br.status,
-           bk.title AS book_title, bk.book_cover, bk.author AS book_author,
+           br.renew_count, br.renew_limit, br.last_renewed_at,
+           u.status      AS user_status,
+           bk.id        AS book_id,
+           bk.title     AS book_title,
+           bk.book_cover,
+           bk.author    AS book_author,
+           bc.book_id   AS copy_book_id,
            CASE WHEN br.status = 'overdue'
              THEN GREATEST(0,(CURRENT_DATE - br.due_date) * ${FINE_PER_DAY})
-             ELSE 0 END AS fine_amount
+             ELSE 0 END AS fine_amount,
+           -- Pre-compute if eligible to renew
+           EXISTS (
+             SELECT 1 FROM book_reservations r
+             WHERE r.book_id = bc.book_id
+               AND r.status IN ('pending', 'ready')
+           ) AS has_reservation_queue
          FROM borrows br
+         JOIN users u       ON u.id  = br.user_id
          JOIN book_copies bc ON bc.id = br.book_copy_id
          JOIN books bk       ON bk.id = bc.book_id
          WHERE br.user_id = $1 AND br.status IN ('borrowing','overdue')
