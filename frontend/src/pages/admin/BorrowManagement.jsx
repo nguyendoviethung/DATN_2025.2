@@ -17,7 +17,6 @@ import { useToast }     from "../../components/Toast";
 import "../../style/BorrowManagement.scss";
 
 const PAGE_SIZE    = 8;
-const FINE_PER_DAY = 5000;
 
 // Các option filter trạng thái, tương ứng với query params backend
 const STATUS_FILTER = [
@@ -57,7 +56,6 @@ const StatusBadge = ({ status }) => {
 };
 
 const fmtDate  = (d) => d ? new Date(d).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
-const fmtMoney = (n) => Number(n).toLocaleString("vi-VN") + " đ";
 const defaultDueDate = () => {
   const d = new Date();
   d.setDate(d.getDate() + 14);
@@ -151,11 +149,12 @@ function ViewModal({ borrowId, onClose }) {
           </div>
 
           {overdueDays > 0 && (
-            <div className="bm-overdue-notice">
-              <WarningOutlined />
-              <span>Overdue <strong>{overdueDays} days</strong> · Fine: <strong>{fmtMoney(overdueDays * FINE_PER_DAY)}</strong></span>
-            </div>
-          )}
+              <div className="bm-overdue-notice">
+                <WarningOutlined />
+                <span>Overdue <strong>{overdueDays} day{overdueDays > 1 ? "s" : ""}</strong></span>
+              </div>
+            )}
+
         </div>
         <div className="bm-modal__footer">
           <button className="bm-btn bm-btn--secondary" onClick={onClose}>Close</button>
@@ -401,9 +400,6 @@ function BorrowModal({ onClose, onDone }) {
                           Borrowing: <strong>{readerInfo.currentBorrowing}/{readerInfo.maxBorrowLimit}</strong>
                           {readerInfo.overdueCount > 0 && (
                             <span className="bm-badge-danger">{readerInfo.overdueCount} overdue</span>
-                          )}
-                          {readerInfo.totalFine > 0 && (
-                            <span className="bm-badge-danger">{fmtMoney(readerInfo.totalFine)} fine</span>
                           )}
                         </div>
                       </div>

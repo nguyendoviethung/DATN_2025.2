@@ -29,8 +29,6 @@ const fmtDate = (d) =>
     day: "2-digit", month: "2-digit", year: "numeric",
   }) : "—";
 
-// ── Compute renewal eligibility on the client side ────
-// Backend validates again on submit — this just controls UI display
 function getRenewInfo(item) {
   const today    = new Date(); today.setHours(0, 0, 0, 0);
   const dueDate  = new Date(item.due_date); dueDate.setHours(0, 0, 0, 0);
@@ -46,8 +44,6 @@ function getRenewInfo(item) {
   const canRenew =
     isActive && !isOverdue && !hasQueue && !limitReached && !isSuspended && !isBanned;
 
-  // Thứ tự ưu tiên: kiểm tra từ trên xuống, lý do cuối cùng match sẽ được dùng
-  // Đặt các lý do quan trọng nhất ở cuối để ghi đè
   let disabledReason = null;
   if (!isActive)    disabledReason = item.status === "returned" ? null : "Book is overdue";
   if (limitReached) disabledReason = `Renewal limit reached (${renewLimit}/${renewLimit})`;
@@ -69,7 +65,6 @@ function getRenewInfo(item) {
   };
 }
 
-// ── Renew Confirmation Modal ──────────────────────────
 function RenewModal({ item, onClose, onSuccess }) {
   const toast = useToast();
   const [loading, setLoading] = useState(false);
@@ -89,28 +84,21 @@ function RenewModal({ item, onClose, onSuccess }) {
     }
   };
 
-  const dotsFilled = info.renewsRemaining - 1; // after this renewal
+  const dotsFilled = info.renewsRemaining - 1;
   const dotsTotal  = info.renewLimit;
 
   return (
     <div className="rh-modal-overlay" onClick={onClose}>
       <div className="rh-modal" onClick={(e) => e.stopPropagation()}>
-
-        {/* Header */}
         <div className="rh-modal-header">
           <div className="rh-modal-title">
             <ReloadOutlined className="rh-modal-icon" />
             <span>Renew Book</span>
           </div>
-          <button className="rh-modal-close" onClick={onClose}>
-            <CloseOutlined />
-          </button>
+          <button className="rh-modal-close" onClick={onClose}><CloseOutlined /></button>
         </div>
 
-        {/* Body */}
         <div className="rh-modal-body">
-
-          {/* Book card */}
           <div className="rh-modal-book">
             <img
               src={item.book_cover || "https://placehold.co/52x72?text=N/A"}
@@ -125,7 +113,6 @@ function RenewModal({ item, onClose, onSuccess }) {
             </div>
           </div>
 
-          {/* Date change visualization */}
           <div className="rh-modal-dates">
             <div className="rh-modal-date-box rh-modal-date-box--old">
               <CalendarOutlined />
@@ -134,7 +121,6 @@ function RenewModal({ item, onClose, onSuccess }) {
                 <span className="rh-modal-date-value">{fmtDate(item.due_date)}</span>
               </div>
             </div>
-
             <div className="rh-modal-date-arrow">
               <svg width="36" height="20" viewBox="0 0 36 20">
                 <path d="M2 10 H30 M24 4 L30 10 L24 16"
@@ -144,7 +130,6 @@ function RenewModal({ item, onClose, onSuccess }) {
               </svg>
               <span className="rh-modal-date-plus">+{RENEW_DAYS} days</span>
             </div>
-
             <div className="rh-modal-date-box rh-modal-date-box--new">
               <CheckCircleOutlined />
               <div>
@@ -154,7 +139,6 @@ function RenewModal({ item, onClose, onSuccess }) {
             </div>
           </div>
 
-          {/* Renewals remaining dots */}
           <div className="rh-modal-renewals">
             <span className="rh-modal-renewals-label">Renewals after this:</span>
             <div className="rh-modal-renewals-dots">
@@ -179,11 +163,8 @@ function RenewModal({ item, onClose, onSuccess }) {
           )}
         </div>
 
-        {/* Footer */}
         <div className="rh-modal-footer">
-          <button className="rh-modal-btn rh-modal-btn--ghost" onClick={onClose}>
-            Cancel
-          </button>
+          <button className="rh-modal-btn rh-modal-btn--ghost" onClick={onClose}>Cancel</button>
           <button
             className="rh-modal-btn rh-modal-btn--confirm"
             onClick={handleConfirm}
@@ -197,7 +178,6 @@ function RenewModal({ item, onClose, onSuccess }) {
   );
 }
 
-// ── Main Page ─────────────────────────────────────────
 export default function ReaderBorrowHistory() {
   const toast = useToast();
   const [items,     setItems]     = useState([]);
@@ -205,7 +185,7 @@ export default function ReaderBorrowHistory() {
   const [page,      setPage]      = useState(1);
   const [status,    setStatus]    = useState("");
   const [loading,   setLoading]   = useState(true);
-  const [renewItem, setRenewItem] = useState(null); // item being renewed
+  const [renewItem, setRenewItem] = useState(null);
 
   const statusRef = useRef("");
   const pageRef   = useRef(1);
@@ -238,16 +218,11 @@ export default function ReaderBorrowHistory() {
     load(p, statusRef.current);
   };
 
-  // After successful renewal, update the item in place without full reload
   const handleRenewSuccess = (res) => {
     setItems((prev) =>
       prev.map((it) =>
         it.id === renewItem.id
-          ? {
-              ...it,
-              due_date:    res.new_due_date,
-              renew_count: Number(it.renew_count ?? 0) + 1,
-            }
+          ? { ...it, due_date: res.new_due_date, renew_count: Number(it.renew_count ?? 0) + 1 }
           : it
       )
     );
@@ -257,7 +232,6 @@ export default function ReaderBorrowHistory() {
 
   return (
     <div className="reader-history">
-      {/* Header */}
       <div className="rh-header">
         <h1><HistoryOutlined /> My Borrow History</h1>
         <div className="rh-filters">
@@ -290,10 +264,7 @@ export default function ReaderBorrowHistory() {
               const info      = getRenewInfo(item);
 
               return (
-                <div
-                  key={item.id}
-                  className={`rh-item ${isOverdue ? "rh-item--overdue" : ""}`}
-                >
+                <div key={item.id} className={`rh-item ${isOverdue ? "rh-item--overdue" : ""}`}>
                   <img
                     src={item.book_cover || "https://placehold.co/56x80?text=N/A"}
                     alt={item.book_title}
@@ -320,7 +291,6 @@ export default function ReaderBorrowHistory() {
                           <strong style={{ color: "#52c41a" }}>{fmtDate(item.return_date)}</strong>
                         </span>
                       )}
-                      {/* Renewal count tag */}
                       {item.status === "borrowing" && Number(item.renew_count) > 0 && (
                         <span className="rh-renewed-tag">
                           <ReloadOutlined /> Renewed {item.renew_count}×
@@ -335,13 +305,11 @@ export default function ReaderBorrowHistory() {
                     )}
                   </div>
 
-                  {/* Right section: status badge + renew button */}
                   <div className="rh-item-right">
                     <span className="rh-badge" style={{ background: m.bg, color: m.color }}>
                       {m.label}
                     </span>
 
-                    {/* Renew button — only for borrowing status */}
                     {item.status === "borrowing" && (
                       <div className="rh-renew-wrap">
                         {info.canRenew ? (
@@ -362,16 +330,11 @@ export default function ReaderBorrowHistory() {
                             </div>
                           )
                         )}
-                        {/* Renewals progress dots */}
                         <div className="rh-renew-dots">
                           {Array.from({ length: info.renewLimit }).map((_, i) => (
                             <span
                               key={i}
-                              className={`rh-renew-dot ${
-                                i < info.renewCount
-                                  ? "rh-renew-dot--used"
-                                  : "rh-renew-dot--avail"
-                              }`}
+                              className={`rh-renew-dot ${i < info.renewCount ? "rh-renew-dot--used" : "rh-renew-dot--avail"}`}
                             />
                           ))}
                         </div>
@@ -385,27 +348,14 @@ export default function ReaderBorrowHistory() {
 
           {totalPages > 1 && (
             <div className="rh-pagination">
-              <button
-                className="rh-pg-btn"
-                disabled={page === 1}
-                onClick={() => handlePage(page - 1)}
-              >
-                ‹ Prev
-              </button>
+              <button className="rh-pg-btn" disabled={page === 1} onClick={() => handlePage(page - 1)}>‹ Prev</button>
               <span className="rh-pg-info">Page {page} / {totalPages}</span>
-              <button
-                className="rh-pg-btn"
-                disabled={page === totalPages}
-                onClick={() => handlePage(page + 1)}
-              >
-                Next ›
-              </button>
+              <button className="rh-pg-btn" disabled={page === totalPages} onClick={() => handlePage(page + 1)}>Next ›</button>
             </div>
           )}
         </>
       )}
 
-      {/* Renew Confirmation Modal */}
       {renewItem && (
         <RenewModal
           item={renewItem}

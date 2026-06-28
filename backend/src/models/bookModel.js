@@ -29,8 +29,9 @@ const SORT_COLUMNS = {
   borrowed_all_time: 'books.borrowed_all_time',
   created_at: 'books.created_at',
   publish_year: 'books.publish_year',
-  avg_rating: 'avg_rating',
-  review_count: 'review_count',
+  // Sửa tại đây: Chỉ rõ nguồn từ review_stats và dùng COALESCE để tránh lỗi NULL bị đẩy lên đầu khi sort DESC
+  avg_rating: 'COALESCE(review_stats.avg_rating, 0)',
+  review_count: 'COALESCE(review_stats.review_count, 0)',
 };
 
 const BookModel = {

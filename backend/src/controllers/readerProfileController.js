@@ -7,10 +7,9 @@ const readerProfileController = {
     try {
       const userId = req.user.id;
 
-      const [user, stats, totalFine] = await Promise.all([
+      const [user, stats] = await Promise.all([
         readerProfileModel.getUserById(userId),
         readerProfileModel.getStats(userId),
-        readerProfileModel.getTotalFine(userId),
       ]);
 
       if (!user) {
@@ -24,7 +23,6 @@ const readerProfileController = {
           overdue_count:       Number(stats.overdue_count),
           total_returned:      Number(stats.total_returned),
           total_borrows:       Number(stats.total_borrows),
-          total_fine:          Number(totalFine),
         },
       });
 
@@ -116,8 +114,6 @@ const readerProfileController = {
     }
   },
 
-  // POST /api/reader-profile/borrows/:id/renew
-  // Gia hạn sách — reader tự thực hiện
   async renewBorrow(req, res) {
     try {
       const borrowId = Number(req.params.id);
@@ -127,7 +123,7 @@ const readerProfileController = {
         return res.status(400).json({ message: 'Invalid borrow ID' });
       }
 
-      const result = await borrowModel.renew(borrowId, userId); // ← sửa: borrowModel thay vì BorrowModel
+      const result = await borrowModel.renew(borrowId, userId);
 
       return res.json({
         message:          'Book renewed successfully',

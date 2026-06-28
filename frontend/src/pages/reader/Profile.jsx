@@ -1,4 +1,3 @@
-// frontend/src/pages/reader/Profile.jsx
 import { useState, useEffect, useRef } from "react";
 import { Spin } from "antd";
 import { EditOutlined, CameraOutlined, SaveOutlined, CloseOutlined, UserOutlined } from "@ant-design/icons";
@@ -6,8 +5,7 @@ import readerProfileService from "../../services/readerProfileService";
 import { useToast }         from "../../components/Toast";
 import "../../style/ReaderProfile.scss";
 
-const fmtDate  = d => d ? new Date(d).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit", year:"numeric" }) : "—";
-const fmtMoney = n => Number(n).toLocaleString("vi-VN") + " đ";
+const fmtDate = d => d ? new Date(d).toLocaleDateString("vi-VN", { day:"2-digit", month:"2-digit", year:"numeric" }) : "—";
 
 function resizeImage(file, maxSize = 400) {
   return new Promise((resolve, reject) => {
@@ -145,13 +143,6 @@ export default function Profile() {
           </div>
         )}
       </div>
-
-      {/* ── Fine notice (nếu có) ── */}
-      {user.total_fine > 0 && (
-        <div className="rp-fine-notice">
-          ⚠ Outstanding fine: <strong>{fmtMoney(user.total_fine)}</strong> — Please contact librarian to resolve.
-        </div>
-      )}
 
       {/* ── Personal Info ── */}
       <div className="rp-info-card">

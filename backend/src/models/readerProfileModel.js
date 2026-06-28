@@ -1,7 +1,5 @@
 import getPool from '../config/db.js';
 
-const FINE_PER_DAY = 5000;
-
 const readerProfileModel = {
 
   async getUserById(userId) {
@@ -24,15 +22,6 @@ const readerProfileModel = {
       [userId]
     );
     return res.rows[0];
-  },
-
-  async getTotalFine(userId) {
-    const res = await getPool().query(
-      `SELECT COALESCE(SUM((CURRENT_DATE - due_date) * $2), 0) AS total_fine
-       FROM borrows WHERE user_id = $1 AND status = 'overdue'`,
-      [userId, FINE_PER_DAY]
-    );
-    return res.rows[0].total_fine;
   },
 
   async updateProfile(userId, full_name, phone, address) {
@@ -91,10 +80,6 @@ const readerProfileModel = {
          bk.author    AS book_author,
          bc.barcode,
          bc.book_id   AS copy_book_id,
-         CASE WHEN br.status = 'overdue'
-           THEN GREATEST(0, (CURRENT_DATE - br.due_date) * ${FINE_PER_DAY})
-           ELSE 0 END AS fine_amount,
-         -- Check if any reservation exists for this book (to disable renew)
          EXISTS (
            SELECT 1 FROM book_reservations r
            WHERE r.book_id = bc.book_id
@@ -127,10 +112,6 @@ const readerProfileModel = {
            bk.book_cover,
            bk.author    AS book_author,
            bc.book_id   AS copy_book_id,
-           CASE WHEN br.status = 'overdue'
-             THEN GREATEST(0,(CURRENT_DATE - br.due_date) * ${FINE_PER_DAY})
-             ELSE 0 END AS fine_amount,
-           -- Pre-compute if eligible to renew
            EXISTS (
              SELECT 1 FROM book_reservations r
              WHERE r.book_id = bc.book_id

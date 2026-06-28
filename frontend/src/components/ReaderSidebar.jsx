@@ -22,7 +22,7 @@ const MENU = [
   { key: "books",        icon: <BookOutlined />,    label: "Books",        path: "/reader/books"        },
   { key: "reservations", icon: <SaveOutlined />,    label: "Reservations", path: "/reader/reservations" },
   { key: "history",      icon: <HistoryOutlined />, label: "My Borrows",   path: "/reader/history"      },
-  { key: "chat",         icon: <MessageOutlined />, label: "Chat",         path: "/reader/chat"         },
+  // { key: "chat",         icon: <MessageOutlined />, label: "Chat",         path: "/reader/chat"         },
   { key: "profile",      icon: <UserOutlined />,    label: "My Profile",   path: "/reader/profile"      },
 ];
 

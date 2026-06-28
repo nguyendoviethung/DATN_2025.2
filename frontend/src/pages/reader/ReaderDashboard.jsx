@@ -8,25 +8,24 @@ import readerProfileService from "../../services/readerProfileService";
 import { useToast } from "../../components/Toast";
 import { useNavigate } from "react-router-dom";
 import "../../style/ReaderDashboard.scss";
- 
-const fmtDate  = d => d ? new Date(d).toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}) : "—";
-const fmtMoney = n => Number(n).toLocaleString("vi-VN") + " đ";
- 
+
+const fmtDate = d => d ? new Date(d).toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}) : "—";
+
 const STATUS_META = {
   borrowing: { bg:"#e6f4ff", color:"#0958d9", dot:"#2c8df4", label:"Borrowing" },
   overdue:   { bg:"#fff1f0", color:"#cf1322", dot:"#ff4d4f", label:"Overdue"   },
   returned:  { bg:"#f6ffed", color:"#389e0d", dot:"#52c41a", label:"Returned"  },
 };
- 
+
 export default function ReaderDashboard() {
   const toast    = useToast();
   const navigate = useNavigate();
- 
-  const [user,         setUser]         = useState(null);
-  const [activeBorrows,setActiveBorrows]= useState([]);
-  const [topBooks,     setTopBooks]     = useState([]);
-  const [loading,      setLoading]      = useState(true);
- 
+
+  const [user,          setUser]         = useState(null);
+  const [activeBorrows, setActiveBorrows]= useState([]);
+  const [topBooks,      setTopBooks]     = useState([]);
+  const [loading,       setLoading]      = useState(true);
+
   useEffect(() => {
     Promise.all([
       readerProfileService.getMe(),
@@ -40,20 +39,20 @@ export default function ReaderDashboard() {
       .catch(() => toast.error("Failed to load dashboard"))
       .finally(() => setLoading(false));
   }, []);
- 
+
   if (loading) return (
     <div style={{ display:"flex", justifyContent:"center", padding:"6rem" }}>
       <Spin size="large" />
     </div>
   );
- 
+
   const statCards = [
-    { label: "Currently Borrowing", value: user?.currently_borrowing ?? 0, icon: <BookOutlined />,         color: "#8ac7f7", iconColor: "#0581f5" },
-    { label: "Overdue Books",        value: user?.overdue_count ?? 0,       icon: <WarningOutlined />,      color: "#ef8e88", iconColor: "#f41014" },
-    { label: "Total Borrowed",       value: user?.total_borrows ?? 0,       icon: <ReadOutlined />,         color: "#aa7cef", iconColor: "#6c12ea" },
-    { label: "Total Returned",       value: user?.total_returned ?? 0,      icon: <CheckCircleOutlined />,  color: "#cef4a9", iconColor: "#47ca05" },
+    { label: "Currently Borrowing", value: user?.currently_borrowing ?? 0, icon: <BookOutlined />,        color: "#8ac7f7", iconColor: "#0581f5" },
+    { label: "Overdue Books",        value: user?.overdue_count ?? 0,       icon: <WarningOutlined />,     color: "#ef8e88", iconColor: "#f41014" },
+    { label: "Total Borrowed",       value: user?.total_borrows ?? 0,       icon: <ReadOutlined />,        color: "#aa7cef", iconColor: "#6c12ea" },
+    { label: "Total Returned",       value: user?.total_returned ?? 0,      icon: <CheckCircleOutlined />, color: "#cef4a9", iconColor: "#47ca05" },
   ];
- 
+
   return (
     <div className="reader-dashboard">
       {/* ── Welcome Banner ── */}
@@ -70,14 +69,8 @@ export default function ReaderDashboard() {
             <p className="rd-hero__sub">Welcome back to Mindspace Library</p>
           </div>
         </div>
-        {user?.total_fine > 0 && (
-          <div className="rd-hero__fine-alert">
-            <WarningOutlined />
-            Outstanding fine: <strong>{fmtMoney(user.total_fine)}</strong>
-          </div>
-        )}
       </div>
- 
+
       {/* ── Stat Cards ── */}
       <div className="rd-stats">
         {statCards.map((card, i) => (
@@ -88,7 +81,7 @@ export default function ReaderDashboard() {
           </div>
         ))}
       </div>
- 
+
       <div className="rd-body">
         {/* ── Active Borrows ── */}
         <div className="rd-section">
@@ -98,7 +91,7 @@ export default function ReaderDashboard() {
               View all →
             </button>
           </div>
- 
+
           {activeBorrows.length === 0 ? (
             <div className="rd-empty">
               <BookOutlined />
@@ -107,8 +100,8 @@ export default function ReaderDashboard() {
           ) : (
             <div className="rd-borrow-list">
               {activeBorrows.map(b => {
-                const m       = STATUS_META[b.status] || STATUS_META.borrowing;
-                const daysLeft= b.status === "overdue"
+                const m        = STATUS_META[b.status] || STATUS_META.borrowing;
+                const daysLeft = b.status === "overdue"
                   ? -Math.floor((Date.now() - new Date(b.due_date)) / 86400000)
                   : Math.ceil((new Date(b.due_date) - Date.now()) / 86400000);
                 return (
@@ -130,9 +123,6 @@ export default function ReaderDashboard() {
                           : <span className="rd-days-tag">{daysLeft}d left</span>
                         }
                       </div>
-                      {b.fine_amount > 0 && (
-                        <div className="rd-fine-tag">⚠ Fine: {fmtMoney(b.fine_amount)}</div>
-                      )}
                     </div>
                     <span className="rd-status-dot" style={{ background: m.bg, color: m.color, borderColor: m.dot }}>
                       {m.label}
@@ -143,7 +133,7 @@ export default function ReaderDashboard() {
             </div>
           )}
         </div>
- 
+
         {/* ── Popular Books ── */}
         <div className="rd-section">
           <div className="rd-section-header">

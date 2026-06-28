@@ -38,10 +38,10 @@ export const menuItemsAdmin = [
     label: "Reservations",
     path: "/admin/reservations",
   },
-  {
-    key: "messages",
-    icon: <MessageOutlined />,
-    label: "Messages",
-    path: "/admin/messages",
-  },
+  // {
+  //   key: "messages",
+  //   icon: <MessageOutlined />,
+  //   label: "Messages",
+  //   path: "/admin/messages",
+  // },
 ];
